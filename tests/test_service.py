@@ -15,7 +15,7 @@ def fake_pipeline(monkeypatch, tmp_path):
 def test_service_orchestrates_and_returns_structured_result(monkeypatch, tmp_path):
     fake_pipeline(monkeypatch, tmp_path)
     product = {"product_id": "P1", "product_name": "Demo", "category": "food"}
-    rules = [{"rule_id": "R1", "declaration": "mrp", "required": True, "validation_type": "price", "severity": "HIGH"}]
+    rules = [{"rule_id": "R1", "declaration": "mrp", "required": True, "validation_type": "price", "severity": "HIGH", "applicability": {"type": "all_demo_products"}}]
     result = process_inspection(product, ["front.png"], rules)
     assert result["status"] == "COMPLETED"
     assert result["inspection_id"].startswith("INSP-")
@@ -43,4 +43,3 @@ def test_partial_image_failure_preserves_success(monkeypatch):
     result = process_inspection({"product_id": "P1"}, ["good.png", "bad.png"], [])
     assert result["status"] == "COMPLETED"
     assert {item["status"] for item in result["images"]} == {"COMPLETED_WITH_WARNING", "FAILED"}
-

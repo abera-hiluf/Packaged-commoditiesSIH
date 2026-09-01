@@ -12,14 +12,18 @@ from datetime import datetime
 from typing import Any
 
 
-def _result(field: str, original: Any, normalized: Any, status: str, method: str, warnings: list[str] | None = None, **evidence: Any) -> dict[str, Any]:
-    return {"field": field, "original_value": original, "normalized_value": normalized, "normalization_status": status, "normalization_method": method, "warnings": warnings or [], **evidence}
+def _result(field: str, original: Any, normalized: Any, status: str, normalization_method: str, warnings: list[str] | None = None, **evidence: Any) -> dict[str, Any]:
+    return {"field": field, "original_value": original, "normalized_value": normalized, "normalization_status": status, "normalization_method": normalization_method, "warnings": warnings or [], **evidence}
 
 
 def _raw_value(value: Any) -> tuple[Any, dict[str, Any]]:
     if isinstance(value, dict):
         original = value.get("original_value", value.get("value"))
-        evidence = {key: value[key] for key in ("source_text", "ocr_confidence", "extraction_confidence", "image_id", "bbox", "method", "status") if key in value}
+        evidence = {key: value[key] for key in ("source_text", "ocr_confidence", "extraction_confidence", "image_id", "bbox") if key in value}
+        if "method" in value:
+            evidence["extraction_method"] = value["method"]
+        if "status" in value:
+            evidence["extraction_status"] = value["status"]
         return original, evidence
     return value, {}
 
@@ -139,4 +143,3 @@ def normalize_extracted_fields(extracted_fields: dict[str, Any]) -> dict[str, An
         else:
             normalized[field] = normalize_field(field, value)
     return normalized
-

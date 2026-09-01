@@ -48,11 +48,8 @@ class Repository:
     get_products = list_products
 
     def create_inspection(self, inspection: dict[str, Any]) -> str:
-        product_id = inspection["product_id"]
-        if not self.get_product(product_id):
-            self.create_product({"product_id": product_id, "product_name": inspection.get("product_name"), "category": inspection.get("category"), "manufacturer": inspection.get("manufacturer")})
         with self.database.transaction() as db:
-            db.execute("INSERT INTO inspections (inspection_id, product_id, inspection_date, overall_status, created_at) VALUES (?, ?, ?, ?, ?)", (inspection["inspection_id"], product_id, inspection.get("inspection_date", _now()), inspection.get("overall_status"), inspection.get("created_at", _now())))
+            db.execute("INSERT INTO inspections (inspection_id, product_id, inspection_date, overall_status, created_at) VALUES (?, ?, ?, ?, ?)", (inspection["inspection_id"], inspection["product_id"], inspection.get("inspection_date", _now()), inspection.get("overall_status"), inspection.get("created_at", _now())))
         return inspection["inspection_id"]
 
     def get_inspection(self, inspection_id: str) -> dict[str, Any] | None:
@@ -75,6 +72,8 @@ class Repository:
 
     def save_inspection(self, inspection: dict[str, Any]) -> str:
         """Compatibility entry point that persists the inspection header."""
+        if not self.get_product(inspection["product_id"]):
+            self.create_product({"product_id": inspection["product_id"], "product_name": inspection.get("product_name"), "category": inspection.get("category"), "manufacturer": inspection.get("manufacturer")})
         if not self.get_inspection(inspection["inspection_id"]):
             self.create_inspection(inspection)
         return inspection["inspection_id"]
@@ -153,4 +152,3 @@ class Repository:
     def metrics(self) -> dict[str, Any]:
         with self.database.connect() as db:
             return {"total_products": db.execute("SELECT COUNT(*) FROM products").fetchone()[0], "total_inspections": db.execute("SELECT COUNT(*) FROM inspections").fetchone()[0], "total_findings": db.execute("SELECT COUNT(*) FROM compliance_findings").fetchone()[0], "findings_by_status": {row["status"]: row["count"] for row in db.execute("SELECT status, COUNT(*) AS count FROM compliance_findings GROUP BY status")}}
-
