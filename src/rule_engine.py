@@ -7,7 +7,9 @@ not marked APPLICABLE. Prototype rule configuration is not authoritative law.
 from __future__ import annotations
 
 import re
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Iterable
 
 from .applicability import APPLICABLE, NOT_APPLICABLE
@@ -16,6 +18,12 @@ PASS = "PASS"
 FAIL = "FAIL"
 WARNING = "WARNING"
 NEEDS_REVIEW = "NEEDS_REVIEW"
+
+
+def load_rules(path: str | Path) -> dict[str, Any]:
+    """Load externally configured prototype rules without embedding legal logic."""
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def _evidence(field: dict[str, Any] | None) -> dict[str, Any] | list[dict[str, Any]] | None:
@@ -119,4 +127,3 @@ def validate_fields(fields: dict[str, Any], rules: list[dict[str, Any]], context
     for finding in findings:
         finding["status"] = legacy.get(finding["status"], finding["status"])
     return findings
-
