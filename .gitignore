@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+.env
+data/app.db
+data/uploads/
+reports/*.pdf
+reports/*.csv
+reports/*.docx
+!reports/.gitkeep
+

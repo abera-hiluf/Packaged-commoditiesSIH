@@ -1,0 +1,11 @@
+{
+  "metadata": {"status": "SYNTHETIC / DEMO HISTORY", "description": "Fictional historical records for interface and repository testing.", "not_official_data": true},
+  "inspections": [
+    {"inspection_id": "DEMO-I-001", "product_id": "DEMO-P-001", "inspection_date": "2026-08-10", "status": "COMPLIANT", "reviewer": "Demo Reviewer A", "notes": "Synthetic complete-label example."},
+    {"inspection_id": "DEMO-I-002", "product_id": "DEMO-P-002", "inspection_date": "2026-08-12", "status": "NON-COMPLIANT", "reviewer": "Demo Reviewer B", "notes": "Synthetic missing-MRP example."},
+    {"inspection_id": "DEMO-I-003", "product_id": "DEMO-P-003", "inspection_date": "2026-08-15", "status": "WARNING", "reviewer": "Demo Reviewer A", "notes": "Synthetic missing consumer-care example."},
+    {"inspection_id": "DEMO-I-004", "product_id": "DEMO-P-004", "inspection_date": "2026-08-18", "status": "NON-COMPLIANT", "reviewer": "Demo Reviewer C", "notes": "Synthetic missing manufacturer example."},
+    {"inspection_id": "DEMO-I-005", "product_id": "DEMO-P-005", "inspection_date": "2026-08-20", "status": "NEEDS REVIEW", "reviewer": "Demo Reviewer B", "notes": "Synthetic suspicious quantity requiring human review."},
+    {"inspection_id": "DEMO-I-006", "product_id": "DEMO-P-006", "inspection_date": "2026-08-22", "status": "COMPLIANT", "reviewer": "Demo Reviewer A", "notes": "Synthetic multi-image inspection example."}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "metadata": {"status": "SYNTHETIC / DEMO DATA", "description": "Fictional package examples created only for SIH26034 prototype testing.", "not_official_data": true},
+  "products": [
+    {"product_id": "DEMO-P-001", "product_name": "Sunvale Premium Rice", "manufacturer": "Sunvale Foods Pvt Ltd", "category": "Food", "inspection_id": "DEMO-I-001", "inspection_date": "2026-08-10", "image_paths": ["samples/package_images/demo_p001_complete.png"], "package_type": "Retail pouch", "expected_demo_status": "COMPLIANT"},
+    {"product_id": "DEMO-P-002", "product_name": "BlueKite Instant Oats", "manufacturer": "BlueKite Kitchens LLP", "category": "Food", "inspection_id": "DEMO-I-002", "inspection_date": "2026-08-12", "image_paths": ["samples/package_images/demo_p002_missing_mrp.png"], "package_type": "Retail carton", "expected_demo_status": "NON-COMPLIANT"},
+    {"product_id": "DEMO-P-003", "product_name": "MellowMint Herbal Soap", "manufacturer": "MellowMint Careworks", "category": "Personal care", "inspection_id": "DEMO-I-003", "inspection_date": "2026-08-15", "image_paths": ["samples/package_images/demo_p003_missing_contact.png"], "package_type": "Wrapped bar", "expected_demo_status": "WARNING"},
+    {"product_id": "DEMO-P-004", "product_name": "Northstar Dishwash Gel", "manufacturer": "", "category": "Household", "inspection_id": "DEMO-I-004", "inspection_date": "2026-08-18", "image_paths": ["samples/package_images/demo_p004_missing_manufacturer.png"], "package_type": "Plastic bottle", "expected_demo_status": "NON-COMPLIANT"},
+    {"product_id": "DEMO-P-005", "product_name": "CedarGlow Ground Coffee", "manufacturer": "CedarGlow Roasters", "category": "Food", "inspection_id": "DEMO-I-005", "inspection_date": "2026-08-20", "image_paths": ["samples/package_images/demo_p005_suspicious_quantity.png"], "package_type": "Foil pouch", "expected_demo_status": "NEEDS REVIEW"},
+    {"product_id": "DEMO-P-006", "product_name": "HarborLeaf Green Tea", "manufacturer": "HarborLeaf Trading Co.", "category": "Food", "inspection_id": "DEMO-I-006", "inspection_date": "2026-08-22", "image_paths": ["samples/package_images/demo_p006_front.png", "samples/package_images/demo_p006_back.png", "samples/package_images/demo_p006_side.png"], "package_type": "Multi-panel carton", "expected_demo_status": "COMPLIANT"}
+  ]
+}
