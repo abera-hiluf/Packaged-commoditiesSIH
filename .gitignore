@@ -8,9 +8,10 @@ venv/
 env/
 .env
 data/app.db
+data/compliance.db
+data/*.sqlite
 data/uploads/
 reports/*.pdf
 reports/*.csv
 reports/*.docx
 !reports/.gitkeep
-
