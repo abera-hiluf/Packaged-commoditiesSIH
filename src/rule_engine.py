@@ -73,7 +73,13 @@ def _validate_value(validation_type: str, field: dict[str, Any], parameters: dic
                 return NEEDS_REVIEW, "Configured format requires manual review.", "The prototype rule contains an invalid format pattern.", True
             return (PASS, "Value matches the configured basic format.", "The normalized value matched the configured pattern.", False) if valid else (FAIL, "Value does not match the configured basic format.", "The normalized value did not match the configured pattern.", False)
         return WARNING, "Basic format check is limited.", "No format pattern was configured; human review is recommended.", True
-    if validation_type in {"conditional", "readability"}:
+    if validation_type == "readability":
+        if field.get("normalization_status") in {"CONFLICT", "NEEDS_REVIEW", "NOT_FOUND"} or field.get("normalized_value") == "LOW":
+            return WARNING, "Label readability may be insufficient for reliable OCR.", "OCR diagnostics indicate low or uncertain text readability; verify the image manually.", True
+        if field.get("normalized_value") == "SUFFICIENT":
+            return PASS, "Label readability was sufficient for OCR processing.", "OCR produced usable text from the uploaded image evidence.", False
+        return NEEDS_REVIEW, "Label readability requires manual verification.", "No reliable readability diagnostic was available.", True
+    if validation_type == "conditional":
         return NEEDS_REVIEW, "Field requires manual verification.", "This prototype validation depends on information not reliably available to the rule engine.", True
     return NEEDS_REVIEW, "Validation type requires manual review.", f"Validation type '{validation_type}' is not supported by this prototype.", True
 
@@ -88,12 +94,12 @@ def evaluate_rule(rule: dict[str, Any], normalized_fields: dict[str, Any], appli
     field = normalized_fields.get(field_name)
     if not field:
         if rule.get("required"):
-            return _finding(rule, FAIL, f"Required {field_name} declaration was not detected.", "The applicable field was not extracted from the available package evidence.")
+            return _finding(rule, NEEDS_REVIEW, f"Required {field_name} declaration was not detected.", "The available evidence does not establish that the declaration is absent; verify the original package image.", requires_review=True)
         return _finding(rule, WARNING, f"Optional or conditional {field_name} declaration was not detected.", "The field is not configured as required; applicability or presence may need human review.", requires_review=True)
     if field.get("status") == "CONFLICT":
         return _finding(rule, NEEDS_REVIEW, f"{field_name} requires manual verification.", f"Multiple conflicting {field_name} values were detected across package evidence.", field, True)
     if field.get("normalization_status") == "NOT_FOUND":
-        return _finding(rule, FAIL if rule.get("required") else WARNING, f"{field_name} was not normalized.", "The applicable field did not produce a normalized value.", field)
+        return _finding(rule, NEEDS_REVIEW, f"{field_name} could not be normalized.", "The extracted evidence is insufficient to establish a definitive compliance failure.", field, True)
     status, message, reason, review = _validate_value(rule.get("validation_type", "presence"), field, rule.get("validation_parameters", {}))
     return _finding(rule, status, message, reason, field, review)
 

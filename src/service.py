@@ -24,6 +24,10 @@ def _image_id(path: str | Path, index: int) -> str:
     return stem
 
 
+def image_id_for_name(path: str | Path, index: int = 0) -> str:
+    return _image_id(path, index)
+
+
 def _unique_image_ids(image_paths: Iterable[str | Path]) -> list[str]:
     used: set[str] = set()
     result = []
@@ -53,26 +57,62 @@ def _image_evidence(extracted: dict[str, Any], normalized: dict[str, Any], image
     return records
 
 
-def process_inspection(product: dict[str, Any], image_paths: Iterable[str | Path], rules: list[dict[str, Any]], inspection_metadata: dict[str, Any] | None = None, repository: Repository | None = None) -> dict[str, Any]:
+def _image_input(item: Any, index: int) -> tuple[str, Any, str]:
+    """Return stable ID, decodable source, and human-readable name.
+
+    Sources may be paths (CLI/local compatibility), bytes, or dictionaries from
+    Streamlit. Bytes are deliberately kept in memory so Cloud does not depend
+    on a Windows path or a persistent local filesystem.
+    """
+    if isinstance(item, dict):
+        name = str(item.get("name") or item.get("image_id") or f"image_{index + 1}")
+        image_id = str(item.get("image_id") or _image_id(name, index))
+        source = item.get("bytes", item.get("data", item.get("path")))
+        if source is None:
+            raise ValueError(f"Image input '{name}' has no bytes or path.")
+        return image_id, source, name
+    if isinstance(item, (bytes, bytearray, memoryview)):
+        name = f"image_{index + 1}"
+        return _image_id(name, index), item, name
+    name = str(item)
+    return _image_id(name, index), item, name
+
+
+def process_inspection(product: dict[str, Any], image_paths: Iterable[Any], rules: list[dict[str, Any]], inspection_metadata: dict[str, Any] | None = None, repository: Repository | None = None) -> dict[str, Any]:
     """Run all pipeline stages and return a complete, persistence-backed result."""
     metadata = inspection_metadata or {}
-    paths = [str(path) for path in image_paths]
+    inputs = [_image_input(item, index) for index, item in enumerate(image_paths)]
+    paths = [name for _, _, name in inputs]
     inspection_id = metadata.get("inspection_id") or f"INSP-{uuid.uuid4().hex[:10].upper()}"
     logger.info("PROCESSING_STARTED inspection_id=%s image_count=%s", inspection_id, len(paths))
     result: dict[str, Any] = {"inspection_id": inspection_id, "status": "PROCESSING", "overall_status": "REVIEW_REQUIRED", "product": product, "images": [], "ocr": [], "extracted_fields": {}, "normalized_fields": {}, "applicability": [], "findings": [], "evidence": [], "summary": {}, "errors": []}
-    image_ids = _unique_image_ids(paths)
-    image_paths_by_id = dict(zip(image_ids, paths))
+    # Preserve caller IDs while making duplicate upload names unambiguous.
+    used_ids: set[str] = set()
+    deduped_inputs = []
+    for index, (image_id, source, name) in enumerate(inputs):
+        candidate = image_id
+        if candidate in used_ids:
+            candidate = f"{candidate}_{index + 1}"
+        used_ids.add(candidate)
+        deduped_inputs.append((candidate, source, name))
+    inputs = deduped_inputs
+    image_ids = [item[0] for item in inputs]
+    image_paths_by_id = {item[0]: item[2] for item in inputs}
     ocr_inputs = []
     successful_images = 0
 
-    for image_id, path in zip(image_ids, paths):
-        image_record = {"image_id": image_id, "image_path": path, "status": "PROCESSING"}
+    for image_id, source, name in inputs:
+        image_record = {"image_id": image_id, "image_name": name, "image_path": name, "status": "PROCESSING", "decoding_status": "PENDING", "preprocessing_status": "PENDING"}
         try:
-            prepared = preprocess_image(path)
+            prepared = preprocess_image(source)
+            image_record.update({"decoding_status": "SUCCESS", "preprocessing_status": "SUCCESS", "preprocessing_steps": prepared["metadata"].get("processing_steps", [])})
             ocr_result = run_ocr(prepared["processed"])
             ocr_payload = ocr_result.as_dict() if hasattr(ocr_result, "as_dict") else dict(ocr_result)
             ocr_payload["image_id"] = image_id
-            image_record.update({"status": "COMPLETED", "metadata": prepared["metadata"]})
+            ocr_status = ocr_payload.get("ocr_status")
+            if not ocr_status:
+                ocr_status = "NO_TEXT" if ocr_payload.get("error") and not ocr_payload.get("text") and "no text" in str(ocr_payload.get("error")).lower() else "FAILED" if ocr_payload.get("error") else "SUCCESS"
+            image_record.update({"status": "COMPLETED", "metadata": prepared["metadata"], "ocr_status": ocr_status, "ocr_text_length": len(ocr_payload.get("text", "")), "ocr_confidence": ocr_payload.get("confidence")})
             result["ocr"].append(ocr_payload)
             ocr_inputs.append(ocr_payload)
             successful_images += 1
@@ -83,17 +123,20 @@ def process_inspection(product: dict[str, Any], image_paths: Iterable[str | Path
         except Exception as exc:
             message = str(exc) or "Image processing failed."
             image_record.update({"status": "FAILED", "error": message})
+            image_record.update({"decoding_status": "FAILED", "preprocessing_status": "FAILED", "ocr_status": "NOT_RUN", "ocr_text_length": 0})
             result["errors"].append({"stage": "image_processing", "image_id": image_id, "error": message})
             logger.warning("IMAGE_PROCESSING_FAILED inspection_id=%s image_id=%s", inspection_id, image_id)
         result["images"].append(image_record)
 
     if not ocr_inputs:
-        result["status"] = "FAILED"
-        result["errors"].append({"stage": "pipeline", "error": "No image could be processed."})
-        return _persist_result(result, product, paths, repository)
+        result["errors"].append({"stage": "pipeline", "error": "No image could be processed; compliance findings are review-only."})
 
     extracted = extract_fields_from_images(ocr_inputs)
     normalized = normalize_extracted_fields(extracted)
+    readable = [item for item in result["ocr"] if item.get("ocr_status") == "SUCCESS" and item.get("text")]
+    if readable:
+        confidence_values = [item.get("confidence") for item in readable if item.get("confidence") is not None]
+        normalized["label_readability"] = {"field": "label_readability", "original_value": "OCR text detected", "normalized_value": "SUFFICIENT" if not confidence_values or max(confidence_values) >= 60 else "LOW", "normalization_status": "NORMALIZED", "normalization_method": "ocr_diagnostic", "ocr_confidence": max(confidence_values) if confidence_values else None, "source_text": "\n".join(item.get("text", "") for item in readable), "image_id": readable[0].get("image_id")}
     result["extracted_fields"] = extracted.fields
     result["normalized_fields"] = normalized
     result["applicability"] = evaluate_rules_applicability(product, rules)

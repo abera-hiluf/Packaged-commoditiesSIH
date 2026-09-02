@@ -63,12 +63,13 @@ def validate_image(image: np.ndarray | None) -> np.ndarray:
     return image
 
 
-def load_image(image_path: str | Path | bytes) -> np.ndarray:
+def load_image(image_path: str | Path | bytes | bytearray | memoryview) -> np.ndarray:
     """Decode a path or byte payload as a color OpenCV image."""
-    if isinstance(image_path, bytes):
-        if not image_path:
+    if isinstance(image_path, (bytes, bytearray, memoryview)):
+        image_bytes = bytes(image_path)
+        if not image_bytes:
             raise ImagePreprocessingError("The supplied image bytes are empty.")
-        decoded = cv2.imdecode(np.frombuffer(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+        decoded = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
     else:
         path = validate_image_path(image_path)
         decoded = cv2.imread(str(path), cv2.IMREAD_COLOR)
@@ -127,7 +128,7 @@ def prepare_for_ocr(image: np.ndarray, threshold_method: str = "otsu") -> np.nda
     return threshold_image(denoised, threshold_method)
 
 
-def preprocess_image(image_path: str | Path | bytes, max_width: int = MAX_IMAGE_WIDTH, max_height: int = MAX_IMAGE_HEIGHT) -> PreparedImage:
+def preprocess_image(image_path: str | Path | bytes | bytearray | memoryview, max_width: int = MAX_IMAGE_WIDTH, max_height: int = MAX_IMAGE_HEIGHT) -> PreparedImage:
     """Load, validate, resize, and prepare an image without overwriting its source."""
     original_decoded = load_image(image_path)
     working_color = resize_image(original_decoded, max_width, max_height)
@@ -140,7 +141,7 @@ def preprocess_image(image_path: str | Path | bytes, max_width: int = MAX_IMAGE_
         "original_channels": int(1 if original_decoded.ndim == 2 else original_decoded.shape[2]),
         "processing_steps": ["validated", "resized_if_oversized", "grayscale", "clahe_contrast", "gaussian_denoise", "threshold_otsu"],
     }
-    return PreparedImage(original=working_color, processed=processed, metadata=metadata)
+    return PreparedImage(original=original_decoded, processed=processed, metadata=metadata)
 
 
 def image_to_png_bytes(image: np.ndarray) -> bytes:
@@ -157,4 +158,3 @@ def pil_to_bytes(image: Image.Image, format: str = "PNG") -> bytes:
     output = BytesIO()
     image.save(output, format=format)
     return output.getvalue()
-

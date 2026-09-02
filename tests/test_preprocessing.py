@@ -26,6 +26,13 @@ def test_invalid_image_is_handled(tmp_path):
         preprocess_image(invalid)
 
 
+def test_uploaded_bytes_are_decoded_without_a_filesystem_path():
+    encoded = SAMPLE.read_bytes()
+    result = preprocess_image(encoded)
+    assert result["original"].size > 0
+    assert result["processed"].size > 0
+
+
 def test_grayscale_conversion_produces_one_channel_image():
     grayscale = convert_to_grayscale(np.zeros((20, 30, 3), dtype=np.uint8))
     assert grayscale.shape == (20, 30)
@@ -49,4 +56,3 @@ def test_original_metadata_and_aspect_ratio_are_preserved():
 def test_resize_does_not_enlarge_small_images():
     resized = resize_image(np.zeros((20, 40, 3), dtype=np.uint8), 100, 100)
     assert resized.shape[:2] == (20, 40)
-

@@ -65,21 +65,42 @@ def _line_candidates(payload: dict[str, Any]) -> list[tuple[str, str]]:
 
 
 PATTERNS: dict[str, list[tuple[str, str]]] = {
-    "mrp": [(r"(?i)\b(?:mrp|maximum\s+retail\s+price)\s*[:\-]?\s*((?:₹|rs\.?|inr)\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?|[0-9][0-9,]*(?:\.[0-9]{1,2})?)\b", "regex")],
-    "net_quantity": [(r"(?i)\b(?:net\s*(?:quantity|qty|weight|wt))\s*[:\-]?\s*([0-9][0-9,.]*\s*(?:kg|kgs?|kilograms?|g|gm|gms?|grams?|ml|millilit(?:re|er)s?|l|lit(?:re|er)s?))\b", "regex")],
-    "manufacturer": [(r"(?i)\bmanufactured\s+by\s*[:\-]?\s*(.+)$", "label_context"), (r"(?i)\bmfd\.?\s+by\s*[:\-]?\s*(.+)$", "label_context")],
+    "mrp": [(r"(?i)\b(?:m\.?r\.?p\.?|maximum\s+retail\s+price)\s*[:\-]?\s*((?:₹|rs\.?|inr)\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?|[0-9][0-9,]*(?:\.[0-9]{1,2})?)", "regex")],
+    "net_quantity": [(r"(?i)\b(?:net\s*(?:quantity|qty|weight|wt)|net\s*(?:qnty|qu?an?t?))\s*[:\-]?\s*([0-9][0-9,.]*\s*(?:kg|kgs?|kilograms?|g|gm|gms?|grams?|ml|millilit(?:re|er)s?|l|lit(?:re|er)s?))\b", "regex")],
+    "manufacturer": [(r"(?i)\b(?:manufactured\s*(?:&|and)\s*marketed\s*by|manufactured\s+by|mfd\.?\s+by)\s*[:\-]?\s*(.+)$", "label_context")],
     "packer": [(r"(?i)\b(?:packed\s+by|packer)\s*[:\-]?\s*(.+)$", "label_context")],
     "importer": [(r"(?i)\b(?:imported\s+by|importer)\s*[:\-]?\s*(.+)$", "label_context")],
-    "consumer_care": [(r"(?i)\b(?:customer\s+care|consumer\s+care|customer\s+service|helpline)\s*[:\-]?\s*(.*(?:\d{3,}.*|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|https?://\S+).*)$", "label_context")],
+    "consumer_care": [(r"(?i)\b(?:customer\s+care|consumer\s+care|consumer\s+complaints?|customer\s+service|helpline|toll\s*free)\s*[:\-]?\s*(.*(?:\d{3,}.*|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|https?://\S+).*)$", "label_context")],
     "country_of_origin": [(r"(?i)\b(?:country\s+of\s+origin|made\s+in|product\s+of)\s*[:\-]?\s*([A-Za-z][A-Za-z .'-]{1,})$", "label_context")],
-    "manufacture_date": [(r"(?i)\b(?:manufacturing\s+date|manufactured\s+on|mfd|mfg)\s*[:\-]?\s*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{1,2}[/-][0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{4})\b", "date_context")],
+    "manufacture_date": [(r"(?i)\b(?:manufacturing\s+date|date\s+of\s+manufacture|manufactured\s+on|mfd\.?\s*date|mfg\.?\s*date|mfd|mfg)\s*[:\-\.]?\s*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{1,2}[/-][0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{4})\b", "date_context")],
     "packing_date": [(r"(?i)\b(?:packing\s+date|packed\s+on|pkd)\s*[:\-]?\s*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{1,2}[/-][0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{4})\b", "date_context")],
     "import_date": [(r"(?i)\b(?:import\s+date|imported\s+on)\s*[:\-]?\s*([0-9]{1,2}[/-][0-9]{1,2}[/-][0-9]{2,4}|[0-9]{1,2}[/-][0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{4})\b", "date_context")],
     "best_before": [(r"(?i)\bbest\s+before\s*[:\-]?\s*([^\n]+)$", "label_context")],
-    "use_by": [(r"(?i)\b(?:use\s+by|expiry|expires)\s*[:\-]?\s*([^\n]+)$", "label_context")],
+    "use_by": [(r"(?i)\b(?:use\s+by|best\s+before\s*/?\s*use\s+by|expiry|expires)\s*[:\-]?\s*([^\n]+)$", "label_context")],
     "unit_sale_price": [(r"(?i)\b(?:unit\s+sale\s+price|price\s+per)\s*[:\-]?\s*([^\n]+)$", "label_context")],
     "commodity_name": [(r"(?i)\b(?:product\s+name|commodity|product)\s*[:\-]\s*(.{2,})$", "label_context")],
 }
+
+
+_PRODUCT_NOISE = re.compile(r"(?i)^(?:ingredients?|nutrition|directions?|barcode|scan|www\.|fssai|batch|lot|mfg|mfd|mrp|net|packed|manufactured|customer|consumer|best|use\s+by|expiry|made\s+in)\b")
+
+
+def _product_name_candidate(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Use a conservative, label-agnostic heuristic for unlabelled front panels."""
+    lines = [line for line, _ in _line_candidates(payload)]
+    for index, line in enumerate(lines[:8]):
+        cleaned = re.sub(r"[^A-Za-z0-9&' -]", " ", line).strip()
+        if _PRODUCT_NOISE.search(cleaned) or len(cleaned) < 3:
+            continue
+        words = cleaned.split()
+        if len(words) == 1 and index + 1 < len(lines):
+            next_line = re.sub(r"[^A-Za-z0-9&' -]", " ", lines[index + 1]).strip()
+            if len(next_line.split()) >= 2 and not _PRODUCT_NOISE.search(next_line):
+                cleaned = f"{cleaned} {next_line}"
+                words = cleaned.split()
+        if len(words) >= 2 and any(char.isalpha() for char in cleaned):
+            return _candidate("commodity_name", cleaned, cleaned, payload, "front_panel_heuristic", 0.65)
+    return None
 
 
 def _extract_from_payload(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -101,6 +122,10 @@ def _extract_from_payload(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 break
         if candidates:
             found[field] = candidates[0] if len(candidates) == 1 else {"field": field, "status": "CONFLICT", "candidates": candidates, "image_id": payload.get("image_id")}
+    if "commodity_name" not in found:
+        candidate = _product_name_candidate(payload)
+        if candidate:
+            found["commodity_name"] = candidate
     return found
 
 
@@ -127,4 +152,3 @@ def extract_fields_from_images(ocr_results: Iterable[Any]) -> ExtractionResult:
         distinct = {candidate.get("value") for candidate in candidates}
         fields[field] = candidates[0] if len(distinct) == 1 else {"field": field, "status": "CONFLICT", "candidates": candidates}
     return ExtractionResult(fields, payloads)
-

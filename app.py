@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
 import streamlit as st
@@ -14,6 +13,7 @@ from components.styles import inject_css
 from src.repository import Repository
 from src.rule_engine import load_rules
 from src.service import process_inspection
+from src.service import image_id_for_name
 
 ROOT = Path(__file__).parent
 RULES_PATH = ROOT / "data" / "rules" / "legal_rules.json"
@@ -59,16 +59,17 @@ def render_new_inspection() -> None:
             return
         product = {"product_id": f"PRODUCT-{id(uploads)}", "product_name": product_name, "category": category, "manufacturer": manufacturer, "package_type": package_type, "origin": origin}
         rules = load_rules(RULES_PATH)["rules"]
-        with tempfile.TemporaryDirectory(prefix="sih26034_") as temp_dir:
-            paths = []
-            for index, upload in enumerate(uploads):
-                path = Path(temp_dir) / f"{index}_{Path(upload.name).name}"
-                path.write_bytes(upload.getvalue())
-                paths.append(path)
-            with st.spinner("Preparing images, reading package text, evaluating findings, and preparing evidence…"):
-                result = process_inspection(product, paths, rules, repository=repo)
+        image_inputs = []
+        upload_images = {}
+        for index, upload in enumerate(uploads):
+            image_id = image_id_for_name(upload.name, index)
+            image_bytes = upload.getvalue()
+            image_inputs.append({"image_id": image_id, "name": upload.name, "bytes": image_bytes})
+            upload_images[image_id] = image_bytes
+        with st.spinner("Preparing images, reading package text, evaluating findings, and preparing evidence…"):
+            result = process_inspection(product, image_inputs, rules, repository=repo)
         st.session_state["current_result"] = result
-        st.session_state["current_uploads"] = {upload.name: upload.getvalue() for upload in uploads}
+        st.session_state["current_uploads"] = upload_images
     if st.session_state.get("current_result"):
         render_results(st.session_state["current_result"], st.session_state.get("current_uploads", {}), repo)
 
@@ -126,4 +127,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -58,3 +58,17 @@ def test_conflicting_values_are_explicit():
     assert result["mrp"]["status"] == "CONFLICT"
     assert {candidate["value"] for candidate in result["mrp"]["candidates"]} == {"₹120", "₹130"}
 
+
+def test_common_package_label_variations_are_supported():
+    fields = extract_fields(ocr("M.R.P. ₹190.00\nNET WT: 1 Kg\nMFG Date: 08/2026\nManufactured & Marketed By: Example Foods\nToll Free: 1800-123-4567\nUSE BY: 12/2027"))
+    assert fields["mrp"]["value"] == "₹190.00"
+    assert fields["net_quantity"]["value"] == "1 Kg"
+    assert "Example Foods" in fields["manufacturer"]["value"]
+    assert "1800" in fields["consumer_care"]["value"]
+    assert fields["use_by"]["value"] == "12/2027"
+
+
+def test_unlabelled_front_panel_product_name_is_preserved():
+    fields = extract_fields(ocr("FORTUNE\nSoya Chunks\nHigh Protein Food"))
+    assert fields["commodity_name"]["value"] == "FORTUNE Soya Chunks"
+    assert fields["commodity_name"]["method"] == "front_panel_heuristic"

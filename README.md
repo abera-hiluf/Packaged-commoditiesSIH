@@ -34,7 +34,12 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Tesseract OCR is an optional system dependency for the OCR phase. The application will handle an unavailable OCR executable as a reviewable processing issue rather than claiming successful OCR.
+Tesseract OCR is a system dependency for the OCR phase. Locally, install the
+Tesseract executable and add it to `PATH` (or set `TESSERACT_CMD`). On
+Streamlit Community Cloud, the committed `packages.txt` installs
+`tesseract-ocr` and English language data; `pytesseract` alone is only the
+Python wrapper. If the executable is unavailable, the application reports a
+reviewable OCR configuration error rather than claiming successful OCR.
 
 ## Legal and data disclaimer
 
@@ -43,4 +48,3 @@ This is a prototype and does not constitute legal advice, legal certification, o
 ## Future production direction
 
 The modules are designed to allow later replacement of Streamlit with React, SQLite with PostgreSQL, local files with object storage, and Tesseract with a stronger document-OCR provider without making an AI model the source of legal truth.
-

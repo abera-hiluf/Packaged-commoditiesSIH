@@ -33,15 +33,36 @@ class OCRResult:
     raw_data: dict[str, Any] | None = None
     error: str | None = None
 
+    @property
+    def status(self) -> str:
+        if self.error and not self.text:
+            return "NO_TEXT" if self.error == "OCR completed but detected no text." else "FAILED"
+        return "SUCCESS"
+
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        result["ocr_status"] = self.status
+        result["raw_text"] = self.text
+        result["ocr_confidence"] = self.confidence
+        return result
 
 
 def configure_tesseract() -> None:
-    """Use TESSERACT_CMD when supplied, otherwise require PATH discovery."""
+    """Use TESSERACT_CMD when supplied, otherwise check standard locations and PATH."""
     command = os.getenv("TESSERACT_CMD")
     if command:
         pytesseract.pytesseract.tesseract_cmd = command
+    else:
+        standard_candidates = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
+            os.path.expandvars(r"%LOCALAPPDATA%\Tesseract-OCR\tesseract.exe"),
+        ]
+        for candidate in standard_candidates:
+            if os.path.isfile(candidate):
+                pytesseract.pytesseract.tesseract_cmd = candidate
+                break
     try:
         pytesseract.get_tesseract_version()
     except Exception as exc:
@@ -136,4 +157,3 @@ def run_ocr_on_images(images: Iterable[tuple[str, np.ndarray] | dict[str, Any]])
         payload["image_id"] = image_id
         results.append(payload)
     return results
-

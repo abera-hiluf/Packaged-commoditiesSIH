@@ -22,6 +22,20 @@ def render_results(result: dict[str, Any], uploaded_images: dict[str, bytes] | N
         st.warning("Some processing steps need attention. Review the structured errors below.")
         with st.expander("Processing details"):
             st.json(result["errors"])
+    with st.expander("OCR & Processing Details"):
+        for image in result.get("images", []):
+            image_id = image.get("image_id", "unknown")
+            st.markdown(f"**{image.get('image_name', image_id)}** (`{image_id}`)")
+            st.write({key: image.get(key) for key in ("decoding_status", "preprocessing_status", "ocr_status", "ocr_text_length", "ocr_confidence", "error") if key in image})
+            ocr = next((item for item in result.get("ocr", []) if item.get("image_id") == image_id), None)
+            if ocr:
+                if ocr.get("ocr_status") == "FAILED":
+                    st.error(ocr.get("error") or "OCR engine unavailable/configuration error.")
+                elif ocr.get("ocr_status") == "NO_TEXT":
+                    st.warning("OCR completed but no usable text was detected.")
+                with st.expander(f"Raw OCR text — {image_id}"):
+                    st.code(ocr.get("raw_text", ocr.get("text", "")) or "(empty)")
+                st.caption(f"Words: {len(ocr.get('words', []))} · Lines: {len(ocr.get('lines', []))}")
     summary = result.get("summary", {})
     cards = st.columns(5)
     for column, label, key in zip(cards, ["Total Rules", "Passed", "Failed", "Warnings", "Needs Review"], ["total_rules", "passed", "failed", "warnings", "needs_review"]):
@@ -29,7 +43,7 @@ def render_results(result: dict[str, Any], uploaded_images: dict[str, bytes] | N
     st.subheader("Detected Declarations")
     fields = result.get("normalized_fields", {})
     if fields:
-        st.dataframe([{"Field": field.replace("_", " ").title(), "Normalized value": value.get("normalized_value"), "Status": value.get("normalization_status"), "Source": value.get("image_id") or "Available evidence"} for field, value in fields.items()], use_container_width=True, hide_index=True)
+        st.dataframe([{"Field": field.replace("_", " ").title(), "Original value": value.get("original_value"), "Normalized value": value.get("normalized_value"), "Status": value.get("normalization_status"), "Source": value.get("image_id") or "Available evidence"} for field, value in fields.items()], use_container_width=True, hide_index=True)
     else:
         st.info("No declarations were extracted from the available images.")
     evidence = _evidence_lookup(result)
@@ -65,4 +79,3 @@ def render_results(result: dict[str, Any], uploaded_images: dict[str, bytes] | N
 
 def _status_label(status: str) -> str:
     return {"COMPLIANT": "✓ COMPLIANT", "NON_COMPLIANT": "✕ NON-COMPLIANT", "REVIEW_REQUIRED": "⚠ REVIEW REQUIRED"}.get(status, status)
-

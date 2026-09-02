@@ -21,9 +21,9 @@ def test_valid_price_passes_and_preserves_evidence():
     assert result["evidence"]["source_text"] == "MRP: ₹120"
 
 
-def test_missing_required_field_fails():
+def test_missing_required_field_requires_review():
     result = evaluate_rule(rule(), {}, applicable())
-    assert result["status"] == FAIL
+    assert result["status"] == NEEDS_REVIEW
     assert result["field_value"] is None
 
 
@@ -57,12 +57,11 @@ def test_multiple_rules_summary_and_overall_status():
     results = evaluate_all_rules(rules, fields, [applicable("R1"), applicable("R2")])
     summary = summarize_findings(results)
     assert summary["total_rules"] == 2
-    assert summary["passed"] == 1 and summary["failed"] == 1
-    assert overall_product_status(results) == "NON_COMPLIANT"
+    assert summary["passed"] == 1 and summary["needs_review"] == 1
+    assert overall_product_status(results) == "REVIEW_REQUIRED"
 
 
 def test_warnings_do_not_automatically_fail_product():
     result = evaluate_rule(rule("country_of_origin", "conditional", required=False), {}, applicable())
     assert result["status"] == "WARNING"
     assert overall_product_status([result]) == "COMPLIANT"
-

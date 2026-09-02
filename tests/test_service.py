@@ -43,3 +43,12 @@ def test_partial_image_failure_preserves_success(monkeypatch):
     result = process_inspection({"product_id": "P1"}, ["good.png", "bad.png"], [])
     assert result["status"] == "COMPLETED"
     assert {item["status"] for item in result["images"]} == {"COMPLETED_WITH_WARNING", "FAILED"}
+
+
+def test_service_accepts_uploaded_bytes_and_preserves_image_id(monkeypatch):
+    monkeypatch.setattr("src.service.preprocess_image", lambda source: {"processed": "processed", "metadata": {"processing_steps": ["decoded"]}})
+    monkeypatch.setattr("src.service.run_ocr", lambda image: {"text": "MRP: ₹120", "confidence": 90, "words": [], "lines": [], "engine": "mock", "error": None, "ocr_status": "SUCCESS"})
+    result = process_inspection({"product_id": "P1"}, [{"image_id": "back_panel", "name": "back.webp", "bytes": b"webp-bytes"}], [])
+    assert result["images"][0]["image_id"] == "back_panel"
+    assert result["images"][0]["decoding_status"] == "SUCCESS"
+    assert result["ocr"][0]["image_id"] == "back_panel"
