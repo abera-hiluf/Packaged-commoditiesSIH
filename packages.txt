@@ -1,3 +1,1 @@
-# Streamlit Community Cloud system dependency for pytesseract.
 tesseract-ocr
-tesseract-ocr-eng
