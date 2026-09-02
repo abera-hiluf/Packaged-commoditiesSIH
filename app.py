@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import streamlit as st
 
-from components.dashboard import render_dashboard
 from components.results import render_results
 from components.styles import inject_css
 from src.repository import Repository
 from src.rule_engine import load_rules
-from src.service import process_inspection
-from src.service import image_id_for_name
 
 ROOT = Path(__file__).parent
 RULES_PATH = ROOT / "data" / "rules" / "legal_rules.json"
@@ -58,6 +54,9 @@ def render_new_inspection() -> None:
             st.warning("Please upload at least one package image.")
             return
         product = {"product_id": f"PRODUCT-{id(uploads)}", "product_name": product_name, "category": category, "manufacturer": manufacturer, "package_type": package_type, "origin": origin}
+        # Keep OpenCV, NumPy, and pytesseract out of the initial page import.
+        from src.service import image_id_for_name, process_inspection
+
         rules = load_rules(RULES_PATH)["rules"]
         image_inputs = []
         upload_images = {}
@@ -116,6 +115,9 @@ def main() -> None:
     if page == "New Inspection":
         render_new_inspection()
     elif page == "Dashboard":
+        # Plotly/pandas are only needed on the dashboard, not on first load.
+        from components.dashboard import render_dashboard
+
         render_dashboard(repo.list_inspections())
     elif page == "Inspection History":
         render_history()

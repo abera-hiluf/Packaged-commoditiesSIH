@@ -1,7 +1,5 @@
 """Dashboard metrics and lightweight charts."""
 
-import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 
@@ -13,8 +11,8 @@ def render_dashboard(inspections: list[dict]) -> None:
         value = len({i.get("product_id") for i in inspections}) if label == "Products" else len(inspections) if label == "Inspections" else statuses.count(label.upper().replace(" ", "-"))
         col.metric(label, value)
     if statuses:
-        frame = pd.DataFrame({"Status": statuses})
-        st.plotly_chart(px.histogram(frame, x="Status", color="Status", title="Review status distribution"), use_container_width=True)
+        status_counts = {status: statuses.count(status) for status in sorted(set(statuses))}
+        st.subheader("Review status distribution")
+        st.bar_chart(status_counts, horizontal=True)
     st.subheader("Recent inspections")
-    st.dataframe(pd.DataFrame([{k: i.get(k) for k in ("inspection_id", "product_name", "inspection_date", "overall_status")} for i in inspections]), use_container_width=True, hide_index=True)
-
+    st.dataframe([{k: i.get(k) for k in ("inspection_id", "product_name", "inspection_date", "overall_status")} for i in inspections], use_container_width=True, hide_index=True)
