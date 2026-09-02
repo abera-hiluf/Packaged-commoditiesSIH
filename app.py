@@ -63,7 +63,7 @@ def render_new_inspection() -> None:
         for index, upload in enumerate(uploads):
             image_id = image_id_for_name(upload.name, index)
             image_bytes = upload.getvalue()
-            image_inputs.append({"image_id": image_id, "name": upload.name, "bytes": image_bytes})
+            image_inputs.append({"image_id": image_id, "name": upload.name, "bytes": image_bytes, "mime_type": upload.type, "file_size": len(image_bytes)})
             upload_images[image_id] = image_bytes
         with st.spinner("Preparing images, reading package text, evaluating findings, and preparing evidence…"):
             result = process_inspection(product, image_inputs, rules, repository=repo)

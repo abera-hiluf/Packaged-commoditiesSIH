@@ -41,6 +41,7 @@ def create_field_evidence(extracted_field: dict[str, Any] | None, normalized_fie
     return {
         "evidence_id": _next_evidence_id(),
         "image_id": extracted_field.get("image_id", normalized_field.get("image_id")),
+        "image_name": extracted_field.get("image_name", normalized_field.get("image_name")),
         "image_path": image_path,
         "source_text": extracted_field.get("source_text", normalized_field.get("source_text")),
         "bbox": _bbox(extracted_field.get("bbox", normalized_field.get("bbox"))),
@@ -153,4 +154,3 @@ def validate_evidence(records: Iterable[dict[str, Any]]) -> list[str]:
         if record.get("image_path") is not None and not isinstance(record.get("image_path"), str):
             errors.append(f"Invalid image reference for {evidence_id or '<unknown>'}")
     return errors
-

@@ -54,7 +54,7 @@ def _bbox_for_source(payload: dict[str, Any], source_text: str) -> list[int] | N
 
 
 def _candidate(field: str, value: str, source_text: str, payload: dict[str, Any], method: str, confidence: float = 0.9, status: str = "EXTRACTED") -> dict[str, Any]:
-    return {"field": field, "value": value.strip(), "source_text": source_text.strip(), "ocr_confidence": payload.get("confidence"), "extraction_confidence": confidence, "image_id": payload.get("image_id"), "bbox": _bbox_for_source(payload, source_text), "method": method, "status": status}
+    return {"field": field, "value": value.strip(), "source_text": source_text.strip(), "ocr_confidence": payload.get("confidence"), "extraction_confidence": confidence, "image_id": payload.get("image_id"), "image_name": payload.get("image_name"), "bbox": _bbox_for_source(payload, source_text), "method": method, "status": status}
 
 
 def _line_candidates(payload: dict[str, Any]) -> list[tuple[str, str]]:

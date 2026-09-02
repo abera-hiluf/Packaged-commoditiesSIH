@@ -26,7 +26,7 @@ def render_results(result: dict[str, Any], uploaded_images: dict[str, bytes] | N
         for image in result.get("images", []):
             image_id = image.get("image_id", "unknown")
             st.markdown(f"**{image.get('image_name', image_id)}** (`{image_id}`)")
-            st.write({key: image.get(key) for key in ("decoding_status", "preprocessing_status", "ocr_status", "ocr_text_length", "ocr_confidence", "error") if key in image})
+            st.write({key: image.get(key) for key in ("file_extension", "mime_type", "file_size", "image_sha256", "image_width", "image_height", "image_channels", "decoding_status", "preprocessing_status", "variants_tested", "ocr_status", "ocr_text_length", "ocr_confidence", "extracted_field_count", "error") if key in image})
             ocr = next((item for item in result.get("ocr", []) if item.get("image_id") == image_id), None)
             if ocr:
                 if ocr.get("ocr_status") == "FAILED":
@@ -61,7 +61,7 @@ def render_results(result: dict[str, Any], uploaded_images: dict[str, bytes] | N
                 st.markdown("**Evidence**")
                 for item in linked:
                     st.write("Detected text:", item.get("source_text") or "Unavailable")
-                    st.write("Image:", item.get("image_id") or "Unavailable")
+                    st.write("Image:", item.get("image_name") or item.get("image_id") or "Unavailable")
                     st.write("OCR confidence:", item.get("ocr_confidence") if item.get("ocr_confidence") is not None else "Unavailable")
                     st.write("Extraction confidence:", item.get("extraction_confidence") if item.get("extraction_confidence") is not None else "Unavailable")
                     if item.get("bbox") is not None:

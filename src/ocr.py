@@ -7,6 +7,7 @@ compliance, or extraction confidence score.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import asdict, dataclass
 from typing import Any, Iterable
 
@@ -32,6 +33,8 @@ class OCRResult:
     config: str = "--oem 3 --psm 6"
     raw_data: dict[str, Any] | None = None
     error: str | None = None
+    language: str = "eng"
+    variant: str | None = None
 
     @property
     def status(self) -> str:
@@ -44,6 +47,8 @@ class OCRResult:
         result["ocr_status"] = self.status
         result["raw_text"] = self.text
         result["ocr_confidence"] = self.confidence
+        result["language"] = self.language
+        result["variant"] = self.variant
         return result
 
 
@@ -109,14 +114,15 @@ def _build_lines(data: dict[str, list[Any]], words: list[dict[str, Any]]) -> lis
 class OCREngine:
     """Tesseract-backed engine with a stable result contract."""
 
-    def __init__(self, config: str = "--oem 3 --psm 6"):
+    def __init__(self, config: str = "--oem 3 --psm 6", language: str = "eng"):
         self.config = config
+        self.language = language
 
     def extract(self, image: np.ndarray) -> OCRResult:
         try:
             image = _validate_image(image)
             configure_tesseract()
-            data = pytesseract.image_to_data(image, config=self.config, output_type=pytesseract.Output.DICT)
+            data = pytesseract.image_to_data(image, lang=self.language, config=self.config, output_type=pytesseract.Output.DICT)
             words = []
             valid_confidences = []
             for index, raw_text in enumerate(data.get("text", [])):
@@ -132,16 +138,47 @@ class OCREngine:
             for word in words:
                 word.pop("index", None)
             text = "\n".join(line["text"] for line in lines)
-            return OCRResult(text=text, confidence=sum(valid_confidences) / len(valid_confidences) if valid_confidences else None, words=words, lines=lines, config=self.config, raw_data=data, error=None if text else "OCR completed but detected no text.")
+            return OCRResult(text=text, confidence=sum(valid_confidences) / len(valid_confidences) if valid_confidences else None, words=words, lines=lines, config=self.config, raw_data=data, error=None if text else "OCR completed but detected no text.", language=self.language)
         except (OCRConfigurationError, OCRInputError) as exc:
-            return OCRResult("", None, [], [], config=self.config, error=str(exc))
+            return OCRResult("", None, [], [], config=self.config, error=str(exc), language=self.language)
         except Exception:
-            return OCRResult("", None, [], [], config=self.config, error="Tesseract could not process this image. Check the image and Tesseract installation.")
+            return OCRResult("", None, [], [], config=self.config, error="Tesseract could not process this image. Check the image and Tesseract installation.", language=self.language)
 
 
-def run_ocr(image: np.ndarray, config: str = "--oem 3 --psm 6") -> OCRResult:
+def run_ocr(image: np.ndarray, config: str = "--oem 3 --psm 6", language: str = "eng") -> OCRResult:
     """Run OCR on one preprocessed image."""
-    return OCREngine(config=config).extract(image)
+    return OCREngine(config=config, language=language).extract(image)
+
+
+def _variant_score(result: OCRResult) -> tuple[int, float, int, int]:
+    text = result.text or ""
+    keywords = len(re.findall(r"(?i)\b(?:mrp|net|weight|quantity|mfg|mfd|manufactur|batch|lot|use|best|care|toll|fssai|soya|food)\b", text))
+    words = len(result.words)
+    confidence = result.confidence if result.confidence is not None else -1.0
+    return keywords, confidence, words, len(text)
+
+
+def run_ocr_variants(variants: dict[str, np.ndarray], language: str = "eng") -> OCRResult:
+    """Run a small PSM/variant matrix and select meaningful OCR evidence."""
+    if not variants:
+        return run_ocr(np.array([], dtype=np.uint8), language=language)
+    attempts: list[tuple[str, OCRResult]] = []
+    for name, image in variants.items():
+        for psm in (6, 11):
+            result = run_ocr(image, config=f"--oem 3 --psm {psm}", language=language)
+            result.variant = f"{name}/psm{psm}"
+            attempts.append((result.variant, result))
+            if result.status == "FAILED":
+                result.raw_data = {"variants_tested": [item[0] for item in attempts]}
+                return result
+    usable = [item for item in attempts if item[1].text.strip()]
+    if not usable:
+        first = attempts[0][1]
+        first.raw_data = {"variants_tested": [name for name, _ in attempts]}
+        return first
+    selected_name, selected = max(usable, key=lambda item: _variant_score(item[1]))
+    selected.raw_data = {"selected_variant": selected_name, "variants_tested": [name for name, _ in attempts], "variant_scores": {name: _variant_score(result) for name, result in attempts}}
+    return selected
 
 
 def run_ocr_on_images(images: Iterable[tuple[str, np.ndarray] | dict[str, Any]]) -> list[dict[str, Any]]:

@@ -27,8 +27,8 @@ class ImagePreprocessingError(ValueError):
 class PreparedImage(dict):
     """Dictionary result with attribute compatibility for earlier callers."""
 
-    def __init__(self, original: np.ndarray, processed: np.ndarray, metadata: dict[str, Any]):
-        super().__init__(original=original, processed=processed, metadata=metadata)
+    def __init__(self, original: np.ndarray, processed: np.ndarray, metadata: dict[str, Any], variants: dict[str, np.ndarray] | None = None):
+        super().__init__(original=original, processed=processed, metadata=metadata, variants=variants or {})
 
     @property
     def original(self) -> np.ndarray:
@@ -41,6 +41,10 @@ class PreparedImage(dict):
     @property
     def metadata(self) -> dict[str, Any]:
         return self["metadata"]
+
+    @property
+    def variants(self) -> dict[str, np.ndarray]:
+        return self["variants"]
 
 
 def validate_image_path(image_path: str | Path) -> Path:
@@ -128,20 +132,38 @@ def prepare_for_ocr(image: np.ndarray, threshold_method: str = "otsu") -> np.nda
     return threshold_image(denoised, threshold_method)
 
 
+def build_ocr_variants(image: np.ndarray) -> dict[str, np.ndarray]:
+    """Create comparable OCR inputs without modifying the original evidence."""
+    validate_image(image)
+    gray = convert_to_grayscale(image)
+    upscaled = cv2.resize(gray, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC)
+    enhanced = enhance_contrast(upscaled)
+    denoised = denoise_image(enhanced)
+    sharpened = cv2.addWeighted(denoised, 1.6, cv2.GaussianBlur(denoised, (0, 0), 3), -0.6, 0)
+    return {
+        "original": image.copy(),
+        "grayscale_upscaled": upscaled,
+        "contrast_sharpened": sharpened,
+        "adaptive_threshold": threshold_image(denoised, "adaptive"),
+    }
+
+
 def preprocess_image(image_path: str | Path | bytes | bytearray | memoryview, max_width: int = MAX_IMAGE_WIDTH, max_height: int = MAX_IMAGE_HEIGHT) -> PreparedImage:
     """Load, validate, resize, and prepare an image without overwriting its source."""
     original_decoded = load_image(image_path)
     working_color = resize_image(original_decoded, max_width, max_height)
     processed = prepare_for_ocr(working_color)
+    variants = build_ocr_variants(working_color)
     metadata = {
         "original_width": int(original_decoded.shape[1]),
         "original_height": int(original_decoded.shape[0]),
         "processed_width": int(processed.shape[1]),
         "processed_height": int(processed.shape[0]),
         "original_channels": int(1 if original_decoded.ndim == 2 else original_decoded.shape[2]),
-        "processing_steps": ["validated", "resized_if_oversized", "grayscale", "clahe_contrast", "gaussian_denoise", "threshold_otsu"],
+        "processing_steps": ["validated", "resized_if_oversized", "grayscale", "upscale_1.5x", "clahe_contrast", "gaussian_denoise", "sharpen", "adaptive_threshold"],
+        "variants_tested": list(variants),
     }
-    return PreparedImage(original=original_decoded, processed=processed, metadata=metadata)
+    return PreparedImage(original=original_decoded, processed=processed, metadata=metadata, variants=variants)
 
 
 def image_to_png_bytes(image: np.ndarray) -> bytes:

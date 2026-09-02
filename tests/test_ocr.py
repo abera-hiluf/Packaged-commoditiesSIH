@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.ocr import OCRConfigurationError, OCRInputError, OCRResult, OCREngine, run_ocr, run_ocr_on_images
+from src.ocr import OCRConfigurationError, OCRInputError, OCRResult, OCREngine, run_ocr, run_ocr_on_images, run_ocr_variants
 from src.preprocessing import preprocess_image
 
 SAMPLE = Path(__file__).parents[1] / "samples" / "package_images" / "demo_p001_complete.png"
@@ -53,3 +53,13 @@ def test_multiple_images_remain_separate(monkeypatch):
     monkeypatch.setattr("src.ocr.pytesseract.image_to_data", lambda *args, **kwargs: {"text": [], "conf": []})
     results = run_ocr_on_images([("front", np.zeros((10, 10), dtype=np.uint8)), ("back", np.zeros((10, 10), dtype=np.uint8))])
     assert [item["image_id"] for item in results] == ["front", "back"]
+
+
+def test_variant_ocr_preserves_selection_diagnostics(monkeypatch):
+    def fake(image, config="", language="eng"):
+        text = "MRP NET WEIGHT MANUFACTURED BY" if "psm 11" in config else "noise"
+        return OCRResult(text, 70.0, [{"text": word, "confidence": 70.0} for word in text.split()], [], config=config, language=language)
+    monkeypatch.setattr("src.ocr.run_ocr", fake)
+    result = run_ocr_variants({"original": np.zeros((10, 10), dtype=np.uint8)})
+    assert result.variant == "original/psm11"
+    assert result.raw_data["variants_tested"] == ["original/psm6", "original/psm11"]
